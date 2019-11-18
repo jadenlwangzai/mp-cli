@@ -24,11 +24,11 @@ program
   .command(commandName)
   .description('构建项目')
   .action(function(options) {
-    const { version, environment, flatform } = configJSON;
+    const { version, environment, platform } = configJSON;
     handleUserInput(commandName, {
       ENVIRONMENT: environment || 'pro',
       VERSION: version || '1.0.0',
-      PLATFORM: flatform || '',
+      PLATFORM: platform || '',
     });
   });
 program.parse(process.argv); // 开始解析用户输入的命令

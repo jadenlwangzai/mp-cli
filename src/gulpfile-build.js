@@ -16,19 +16,28 @@ const configJSON = handleConfigJSON(basePath); // {"version": "1.1.0","flatform"
 var clean = require('gulp-clean');
 
 let isPkgModify = true;
+const { VERSION, ENVIRONMENT } = process.env;
+const { platform } = configJSON;
 
-if (!configJSON.flatform) {
-  configJSON.flatform = 'ali';
+if (!platform) {
+  log(colors.red('========================================================='));
+  log(colors.red('* 请在mp-cli.config.js中输入platform值'));
+  log(colors.red('========================================================='));
+  return;
 }
+
+const buildPlatformName = `${basePath}/dist/${platform}-${VERSION}`;
 
 function copy_src() {
   return gulp
-    .src([
-      `${basePath}/.npmrc`,
-      `${basePath}/mp-cli.config.json`,
-      `${basePath}/src/**`,
-    ])
-    .pipe(gulp.dest(`${basePath}/dist`));
+    .src([`${basePath}/.npmrc`, `${basePath}/CDN/**`, `${basePath}/src/**`])
+    .pipe(gulp.dest(buildPlatformName));
+}
+
+function copy_CDN() {
+  return gulp
+    .src([`${basePath}/CDN/**`])
+    .pipe(gulp.dest(`${basePath}/dist/CDN`));
 }
 
 function select_pkg() {
@@ -38,17 +47,30 @@ function select_pkg() {
   try {
     pkg = require(`${basePath}/package.json`);
   } catch (error) {
+    log(
+      colors.red('=========================================================')
+    );
     colors.res('该项目无包依赖');
+    log(
+      colors.red('=========================================================')
+    );
   }
   if (!pkg) {
     return null;
   }
 
   try {
-    oldPkg = require(`${basePath}/dist/package.json`);
+    oldPkg = require(`${buildPlatformName}/package.json`);
   } catch (error) {
+    log(
+      colors.red('=========================================================')
+    );
+
     log(colors.red(error));
     log(colors.red('该项目还未构建过dist目录'));
+    log(
+      colors.red('=========================================================')
+    );
   }
   if (oldPkg) {
     isPkgModify =
@@ -58,7 +80,7 @@ function select_pkg() {
     // 只取项目依赖，工程依赖删除
     delete pkg.devDependencies;
   }
-  return writePkg(`${basePath}/dist`, pkg);
+  return writePkg(buildPlatformName, pkg);
 }
 
 function css() {
@@ -69,7 +91,7 @@ function css() {
   log(colors.green('=========================='));
   return (
     gulp
-      .src(`${basePath}/src/**/*.{wxss,acss,less}`)
+      .src(`${buildPlatformName}/**/*.{wxss,acss,less}`)
       .pipe(
         less({
           globalVars: {
@@ -81,14 +103,14 @@ function css() {
       .pipe(
         rename(path => {
           // 环境
-          if (configJSON.flatform === 'ali') {
+          if (platform === 'ali') {
             path.extname = '.acss';
           } else {
             path.extname = '.wxss';
           }
         })
       )
-      .pipe(gulp.dest(`${basePath}/dist`))
+      .pipe(gulp.dest(buildPlatformName))
   );
 }
 
@@ -99,19 +121,19 @@ function cleanFile() {
     wx: 'acss,less,css',
   };
   return gulp
-    .src(`${basePath}/dist/**/*.{${extName[configJSON.flatform]}}`)
+    .src(`${buildPlatformName}/**/*.{${extName[platform]}}`)
     .pipe(clean())
-    .pipe(gulp.dest(`${basePath}/dist`));
+    .pipe(gulp.dest(buildPlatformName));
 }
 
 // 结合当前环境 删除dist多余文件
 function replace_flag() {
   let { ENVIRONMENT, VERSION } = process.env;
   return gulp
-    .src(`${basePath}/dist/*.js`)
+    .src(`${buildPlatformName}/**/*.js`)
     .pipe(replace(/\_\_NET\_ENV\_\_/, `'${ENVIRONMENT}'`))
     .pipe(replace(/\_\_VERSION\_\_/, `'${VERSION}'`))
-    .pipe(gulp.dest(`${basePath}/dist`));
+    .pipe(gulp.dest(buildPlatformName));
 }
 
 // function replace_flag_less() {
@@ -129,6 +151,7 @@ function replace_flag() {
 // 先copy 再处理各个源 这个处理方式会造成冗余文件，以及后期任务处理的延迟，ide的自动编译有可能报错
 const run = gulp.series(
   copy_src,
+  copy_CDN,
   replace_flag,
   select_pkg,
   css,

@@ -12,24 +12,32 @@ const rename = require('gulp-rename');
 const pxtorpx = require('wx-px2rpx');
 const less = require('gulp-less');
 const handleConfigJSON = require('./utils/handleConfigJSON');
-const configJSON = handleConfigJSON(basePath); // {"version": "1.1.0","flatform":"wx"}
+const configJSON = handleConfigJSON(basePath); // {"version": "1.1.0","platform":"wx"}
 var clean = require('gulp-clean');
 
 let isPkgModify = true;
+const { VERSION, ENVIRONMENT } = process.env;
+const { platform } = configJSON;
 
-if (!configJSON.flatform) {
-  configJSON.flatform = 'ali';
+if (!platform) {
+  log(colors.red('========================================================='));
+  log(colors.red('* 请在mp-cli.config.js中输入platform值'));
+  log(colors.red('========================================================='));
+  return;
 }
+
+const buildPlatformName = `${basePath}/dist/${platform}-${VERSION}`;
 
 function copy_src() {
   return gulp
-    .src([
-      `${basePath}/.npmrc`,
-      `${basePath}/package.json`,
-      `${basePath}/mp-cli.config.json`,
-      `${basePath}/src/**`,
-    ])
-    .pipe(gulp.dest(`${basePath}/dist`));
+    .src([`${basePath}/.npmrc`, `${basePath}/src/**`])
+    .pipe(gulp.dest(buildPlatformName));
+}
+
+function copy_CDN() {
+  return gulp
+    .src([`${basePath}/CDN/**`])
+    .pipe(gulp.dest(`${basePath}/dist/CDN`));
 }
 
 function select_pkg() {
@@ -39,17 +47,29 @@ function select_pkg() {
   try {
     pkg = require(`${basePath}/package.json`);
   } catch (error) {
-    colors.res('该项目无包依赖');
+    log(
+      colors.red('=========================================================')
+    );
+    colors.res('该项目目录下没有package.json');
+    log(
+      colors.red('=========================================================')
+    );
   }
   if (!pkg) {
     return null;
   }
 
   try {
-    oldPkg = require(`${basePath}/dist/package.json`);
+    oldPkg = require(`${buildPlatformName}/package.json`);
   } catch (error) {
+    log(
+      colors.red('=========================================================')
+    );
     log(colors.red(error));
-    log(colors.red('no dist'));
+    log(colors.red('该项目还未构建出dist包'));
+    log(
+      colors.red('=========================================================')
+    );
   }
   if (oldPkg) {
     isPkgModify =
@@ -59,11 +79,10 @@ function select_pkg() {
     // 只取项目依赖，工程依赖删除
     delete pkg.devDependencies;
   }
-  return writePkg(`${basePath}/dist`, pkg);
+  return writePkg(buildPlatformName, pkg);
 }
 
 function css() {
-  let { ENVIRONMENT } = process.env;
   const CDN_ENV_FLAG = ENVIRONMENT === 'pro' ? 'static' : 'static-test';
   log(colors.green('=========================='));
   log(colors.green('* CDN链接：'), colors.green(CDN_ENV_FLAG));
@@ -76,14 +95,14 @@ function css() {
       .pipe(
         rename(path => {
           // 环境
-          if (configJSON.flatform === 'ali') {
+          if (platform === 'ali') {
             path.extname = '.acss';
           } else {
             path.extname = '.wxss';
           }
         })
       )
-      .pipe(gulp.dest(`${basePath}/dist`))
+      .pipe(gulp.dest(buildPlatformName))
   );
 }
 
@@ -94,19 +113,19 @@ function cleanFile() {
     wx: 'acss,less,css',
   };
   return gulp
-    .src(`${basePath}/dist/**/*.{${extName[configJSON.flatform]}}`)
+    .src(`${buildPlatformName}/**/*.{${extName[platform]}}`)
     .pipe(clean())
-    .pipe(gulp.dest(`${basePath}/dist`));
+    .pipe(gulp.dest(buildPlatformName));
 }
 
 // 结合当前环境 删除dist多余文件
 function replace_flag() {
   let { ENVIRONMENT, VERSION } = process.env;
   return gulp
-    .src(`${basePath}/dist/*.js`)
+    .src(`${buildPlatformName}/**/*.js`)
     .pipe(replace(/\_\_NET\_ENV\_\_/, `'${ENVIRONMENT}'`))
     .pipe(replace(/\_\_VERSION\_\_/, `'${VERSION}'`))
-    .pipe(gulp.dest(`${basePath}/dist`));
+    .pipe(gulp.dest(buildPlatformName));
 }
 
 // function replace_flag_less() {
@@ -124,6 +143,7 @@ function replace_flag() {
 // 先copy 再处理各个源 这个处理方式会造成冗余文件，以及后期任务处理的延迟，ide的自动编译有可能报错
 const base = gulp.series(
   select_pkg,
+  copy_CDN,
   copy_src,
   replace_flag,
   css,
@@ -146,9 +166,17 @@ gulp.watch(
   gulp.series(base)
 );
 
+gulp.watch(
+  `${basePath}/CDN/**`,
+  {
+    // delay:1000
+  },
+  gulp.series(base)
+);
+
 const run = gulp.series(base, () => {
   if (isPkgModify) {
-    if (shell.cd(`dist`).code !== 0) {
+    if (shell.cd(buildPlatformName).code !== 0) {
       log(colors.red('cd dist error'));
     }
     shell.exec(`npm install`);
