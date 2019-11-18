@@ -1,6 +1,6 @@
 {
   "name": "@ljadenwongl/mp-cli",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "miniapp-env",
   "main": "index.js",
   "scripts": {
