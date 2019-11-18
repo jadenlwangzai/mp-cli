@@ -30,7 +30,7 @@ const buildPlatformName = `${basePath}/dist/${platform}-${VERSION}`;
 
 function copy_src() {
   return gulp
-    .src([`${basePath}/.npmrc`, `${basePath}/CDN/**`, `${basePath}/src/**`])
+    .src([`${basePath}/.npmrc`, `${basePath}/src/**`])
     .pipe(gulp.dest(buildPlatformName));
 }
 
