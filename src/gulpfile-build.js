@@ -91,7 +91,7 @@ function css() {
   log(colors.green('=========================='));
   return (
     gulp
-      .src(`${buildPlatformName}/**/*.{wxss,acss,less}`)
+      .src(`${buildPlatformName}/**/*.{css,less}`)
       .pipe(
         less({
           globalVars: {

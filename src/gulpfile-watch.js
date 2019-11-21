@@ -89,7 +89,7 @@ function css() {
   log(colors.green('=========================='));
   return (
     gulp
-      .src(`${basePath}/src/**/*.{wxss,acss,less}`)
+      .src(`${buildPlatformName}/**/*.{css,less}`)
       .pipe(less({ globalVars: { CDN_ENV_FLAG } }))
       // .pipe(postcss([pxtorpx()]))
       .pipe(
